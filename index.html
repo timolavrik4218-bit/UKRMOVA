@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Український клас — місце для уроків, робіт і творчості учнів.">
+  <title>Український клас</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="page-shell">
+    <header class="topbar">
+      <a class="brand" href="#" aria-label="Український клас — на головну">
+        <span class="brand-mark">У</span>
+        <span><strong>український</strong><small>клас</small></span>
+      </a>
+      <nav class="main-nav" aria-label="Основна навігація">
+        <button class="nav-link active" data-view="home">Головна</button>
+        <button class="nav-link" data-view="literature">Українська література</button>
+        <button class="nav-link" data-view="language">Українська мова</button>
+        <button class="nav-link" data-view="works">Роботи учнів</button>
+      </nav>
+      <div class="account-area">
+        <button class="ghost-button" id="admin-nav" data-view="admin" hidden>Адмінка</button>
+        <button class="avatar-button" id="profile-button" aria-label="Відкрити профіль"><span id="avatar">?</span></button>
+        <button class="ghost-button" id="logout-button" hidden>Вийти</button>
+      </div>
+    </header>
+
+    <main>
+      <section class="view active" id="home-view">
+        <div class="hero">
+          <div class="hero-copy">
+            <p class="eyebrow">Вітаємо у нашому класі <span>✦</span></p>
+            <h1>Вчимося. <em>Творимо.</em><br>Надихаємо.</h1>
+            <p class="hero-text">Один простір для української мови, літератури та ваших найкращих робіт.</p>
+            <div class="hero-actions">
+              <button class="primary-button" data-view="literature">Почати навчання <span>→</span></button>
+              <button class="text-button" data-view="works">Переглянути роботи <span>↗</span></button>
+            </div>
+          </div>
+          <div class="hero-art" aria-hidden="true">
+            <div class="sun"></div><div class="line-art">А</div>
+            <div class="book-shape"></div><div class="leaf leaf-one">❧</div><div class="leaf leaf-two">❧</div>
+            <span class="art-note note-one">«</span><span class="art-note note-two">»</span>
+          </div>
+        </div>
+        <div class="section-heading">
+          <div><p class="eyebrow">Сьогодні в класі</p><h2>Оберіть свій напрям</h2></div>
+          <span class="section-count">03 напрямки</span>
+        </div>
+        <div class="subject-grid">
+          <button class="subject-card coral" data-view="literature"><span class="card-number">01</span><span class="card-icon">❧</span><h3>Українська<br>література</h3><p>Читаємо, досліджуємо, відчуваємо</p><span class="card-arrow">↗</span></button>
+          <button class="subject-card yellow" data-view="language"><span class="card-number">02</span><span class="card-icon">Аа</span><h3>Українська<br>мова</h3><p>Говоримо точно, пишемо красиво</p><span class="card-arrow">↗</span></button>
+          <button class="subject-card lavender" data-view="works"><span class="card-number">03</span><span class="card-icon">✎</span><h3>Роботи<br>учнів</h3><p>Надихаємося одне одним</p><span class="card-arrow">↗</span></button>
+        </div>
+      </section>
+
+      <section class="view inner-view" id="literature-view">
+        <div class="view-intro coral-wash"><p class="eyebrow">01 / читаємо серцем</p><h1>Українська<br><em>література</em></h1><p>Відкриваємо знайомі тексти по-новому — через контекст, образи та власні думки.</p></div>
+        <div class="empty-state"><strong>Матеріалів з літератури ще немає</strong><span>Учителька зможе додати їх після підключення навчального контенту.</span></div>
+      </section>
+
+      <section class="view inner-view" id="language-view">
+        <div class="view-intro yellow-wash"><p class="eyebrow">02 / говоримо точно</p><h1>Українська мова</h1><p>Олександр Заболотній</p></div>
+        <div class="daily-lesson" id="daily-lesson"><strong>Сьогоднішню тему ще не додано</strong><span>Вчителька зможе опублікувати її в адмін-панелі.</span></div>
+      </section>
+
+      <section class="view inner-view" id="works-view">
+        <div class="section-heading"><div><p class="eyebrow">03 / галерея натхнення</p><h1>Роботи <em>учнів</em></h1></div><button class="primary-button" id="add-work">+ Додати роботу</button></div>
+        <div class="filters"><button class="filter active">Усі роботи</button><button class="filter">Література</button><button class="filter">Мова</button><button class="filter">Творчість</button></div>
+        <div class="works-grid" id="works-grid"></div>
+      </section>
+
+      <section class="view inner-view" id="admin-view">
+        <div class="section-heading"><div><p class="eyebrow">керування системою</p><h1>Панель <em>адміністратора</em></h1></div><span class="admin-badge">Захищена зона</span></div>
+        <div class="admin-stats"><div><span>Користувачі</span><b id="user-count">—</b></div><div><span>Роботи на модерації</span><b>—</b></div><div><span>Активність за тиждень</span><b>—</b></div></div>
+        <div class="admin-panel lesson-editor"><div class="panel-heading"><h2>Тема на сьогодні</h2><span>Зберігається в Supabase</span></div><form id="daily-lesson-form"><label for="lesson-topic">Тема уроку</label><input id="lesson-topic" maxlength="160" required placeholder="Наприклад: Частини мови"><label for="lesson-homework">Домашнє завдання</label><textarea id="lesson-homework" maxlength="2000" required placeholder="Опишіть завдання для учнів"></textarea><button class="primary-button" type="submit">Опублікувати тему <span>→</span></button></form></div>
+        <div class="admin-panel registration-code-panel"><div class="panel-heading"><h2>Коди реєстрації</h2><span>Одноразові запрошення</span></div><form id="registration-code-form"><label for="registration-code-label">Для кого цей код</label><input id="registration-code-label" maxlength="120" required placeholder="Наприклад: 8-А, група 1"><label for="registration-code-uses">Максимум використань</label><input id="registration-code-uses" type="number" min="1" max="100" value="1" required><label for="registration-code-expires">Дійсний до (необов’язково)</label><input id="registration-code-expires" type="datetime-local"><button class="primary-button" type="submit">Створити код <span>+</span></button></form><div class="generated-code" id="generated-code-output" hidden><span>Новий код — скопіюйте його зараз:</span><strong id="generated-registration-code"></strong><button class="ghost-button" id="copy-registration-code" type="button">Скопіювати</button></div><div id="registration-codes-list" class="users-list"></div></div>
+        <div class="admin-panel"><div class="panel-heading"><h2>Проєкти учнів</h2><span>Перевірка перед публікацією</span></div><div id="admin-works-list" class="admin-works-list"></div></div>
+        <div class="admin-panel"><div class="panel-heading"><h2>Користувачі</h2><span>Тільки для власника системи</span></div><div id="users-list" class="users-list"></div></div>
+      </section>
+    </main>
+
+    <footer><span>© 2024 Український клас</span></footer>
+  </div>
+  <div class="modal-backdrop" id="auth-modal" hidden><div class="modal"><button class="close-modal" aria-label="Закрити">×</button><div id="auth-content"></div></div></div>
+  <aside class="cookie-banner" id="cookie-banner" hidden><div><strong>Налаштування приватності</strong><p>Сесія зберігається після оновлення сторінки. Якщо не буде активності 10 хвилин, сайт автоматично виконає вихід.</p></div><div class="cookie-actions"><button class="cookie-button secondary" id="necessary-cookies">Тільки необхідні</button><button class="cookie-button" id="allow-cookies">Погодитися</button></div></aside>
+  <div class="toast" id="toast" role="status"></div>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="app.js"></script>
+</body>
+</html>
