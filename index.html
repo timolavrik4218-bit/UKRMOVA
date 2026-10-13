@@ -71,7 +71,22 @@
 
       <section class="view inner-view" id="works-view">
         <div class="section-heading"><div><p class="eyebrow">03 / галерея натхнення</p><h1>Роботи <em>учнів</em></h1></div><button class="primary-button" id="add-work">+ Додати роботу</button></div>
-        <div class="filters"><button class="filter active">Усі роботи</button><button class="filter">Література</button><button class="filter">Мова</button><button class="filter">Творчість</button></div>
+        <div class="filters work-filters">
+          <select id="works-subject-filter" aria-label="Фільтр по предмету">
+            <option value="all">Усі предмети</option>
+            <option value="literature">Українська література</option>
+            <option value="language">Українська мова</option>
+            <option value="creative">Проєкти</option>
+            <option value="homework">Домашнє завдання</option>
+          </select>
+          <select id="works-student-filter" aria-label="Фільтр по учню">
+            <option value="all">Усі учні</option>
+          </select>
+          <select id="works-theme-filter" aria-label="Фільтр по темі">
+            <option value="all">Усі теми</option>
+          </select>
+          <button class="text-button" id="clear-works-filters" type="button">Скинути</button>
+        </div>
         <div class="works-grid" id="works-grid"></div>
       </section>
 
@@ -80,7 +95,7 @@
         <div class="admin-stats"><div><span>Користувачі</span><b id="user-count">—</b></div><div><span>Роботи на модерації</span><b>—</b></div><div><span>Активність за тиждень</span><b>—</b></div></div>
         <div class="admin-panel lesson-editor"><div class="panel-heading"><h2>Тема на сьогодні</h2><span>Зберігається в Supabase</span></div><form id="daily-lesson-form"><label for="lesson-topic">Тема уроку</label><input id="lesson-topic" maxlength="160" required placeholder="Наприклад: Частини мови"><label for="lesson-homework">Домашнє завдання</label><textarea id="lesson-homework" maxlength="2000" required placeholder="Опишіть завдання для учнів"></textarea><button class="primary-button" type="submit">Опублікувати тему <span>→</span></button></form></div>
         <div class="admin-panel registration-code-panel"><div class="panel-heading"><h2>Коди реєстрації</h2><span>Одноразові запрошення</span></div><form id="registration-code-form"><label for="registration-code-label">Для кого цей код</label><input id="registration-code-label" maxlength="120" required placeholder="Наприклад: 8-А, група 1"><label for="registration-code-uses">Максимум використань</label><input id="registration-code-uses" type="number" min="1" max="100" value="1" required><label for="registration-code-expires">Дійсний до (необов’язково)</label><input id="registration-code-expires" type="datetime-local"><button class="primary-button" type="submit">Створити код <span>+</span></button></form><div class="generated-code" id="generated-code-output" hidden><span>Новий код — скопіюйте його зараз:</span><strong id="generated-registration-code"></strong><button class="ghost-button" id="copy-registration-code" type="button">Скопіювати</button></div><div id="registration-codes-list" class="users-list"></div></div>
-        <div class="admin-panel"><div class="panel-heading"><h2>Проєкти учнів</h2><span>Перевірка перед публікацією</span></div><div id="admin-works-list" class="admin-works-list"></div></div>
+        <div class="admin-panel"><div class="panel-heading"><h2>Проєкти учнів</h2><span>Перевірка перед публікацією</span></div><div class="admin-work-filters"><div class="admin-subject-tabs" id="admin-subject-tabs"></div><div class="admin-student-tabs" id="admin-student-tabs"></div><div class="admin-theme-tabs" id="admin-theme-tabs"></div></div><div id="admin-works-list" class="admin-works-list"></div></div>
         <div class="admin-panel"><div class="panel-heading"><h2>Користувачі</h2><span>Тільки для власника системи</span></div><div id="users-list" class="users-list"></div></div>
       </section>
     </main>

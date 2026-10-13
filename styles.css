@@ -116,6 +116,12 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--green); out
 .filters { display: flex; gap: 23px; margin-bottom: 27px; border-bottom: 1px solid var(--border); }
 .filter { padding: 12px 0; background: transparent; color: var(--muted); font: 12px var(--mono); }
 .filter.active { border-bottom: 2px solid var(--green); color: var(--text); }
+.work-filters { align-items: center; padding-bottom: 10px; }
+.work-filters select { min-width: 180px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 5px; background: #1c1c1c; color: var(--text); font: 12px var(--sans); }
+.admin-work-filters { display: grid; gap: 12px; padding: 18px 24px 0; }
+.admin-subject-tabs, .admin-student-tabs { display: flex; flex-wrap: wrap; gap: 8px; }
+.admin-filter-pill { padding: 8px 10px; border: 1px solid var(--border); border-radius: 999px; background: transparent; color: var(--muted); font: 11px var(--mono); }
+.admin-filter-pill.active { border-color: var(--green); background: rgba(62, 207, 142, .08); color: var(--green); }
 .work-card { min-height: 220px; position: relative; padding: 23px; border: 1px solid var(--border); border-radius: 6px; background: #302829; }
 .work-card:nth-child(2) { background: #292832; }
 .work-card:nth-child(3) { background: #302e24; }

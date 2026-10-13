@@ -16,6 +16,21 @@ const demoUsersKey = "ukr-class-demo-users";
 const cookieConsentKey = "ukr-class-cookie-consent";
 let currentUser = null;
 let inactivityTimer = null;
+let adminWorkSubjectFilter = "all";
+let adminWorkStudentFilter = "all";
+let adminWorkThemeFilter = "all";
+let publicWorkSubjectFilter = "all";
+let publicWorkStudentFilter = "all";
+let publicWorkThemeFilter = "all";
+let publicWorksCache = [];
+let adminWorksCache = [];
+const subjectLabels = {
+  all: "Усі",
+  literature: "Українська література",
+  language: "Українська мова",
+  creative: "Проєкти",
+  homework: "Домашнє завдання"
+};
 const $ = (selector) => document.querySelector(selector);
 
 function showToast(message) {
@@ -95,8 +110,44 @@ function renderMediaPreview(media = []) {
   }
   return `<div class="work-media media-file"><a href="${escapeHTML(preview.public_url)}" target="_blank" rel="noreferrer">📎 ${escapeHTML(preview.file_name || "Файл")}</a></div>`;
 }
+function matchesSubjectFilter(filter, subject) {
+  if (!filter || filter === "all") return true;
+  if (filter === "homework") return ["language", "literature"].includes(subject);
+  return subject === filter;
+}
 function renderWorks(works = []) {
-  $("#works-grid").innerHTML = works.length ? works.map((work) => `<article class="work-card">${renderMediaPreview(work.media || [])}<span class="work-type">${escapeHTML(work.type)}</span><h3>${escapeHTML(work.title)}</h3><p>${escapeHTML(work.text)}</p>${work.author ? `<small>${escapeHTML(work.author)}</small>` : ""}<span class="work-arrow">↗</span></article>`).join("") : '<div class="empty-state"><strong>Поки що немає робіт</strong><span>Учнівські роботи з’являться тут після першої публікації.</span></div>';
+  $("#works-grid").innerHTML = works.length ? works.map((work) => `<article class="work-card">${renderMediaPreview(work.media || [])}<span class="work-type">${escapeHTML(work.type)}</span><h3>${escapeHTML(work.title)}</h3><p>${escapeHTML(work.text)}</p>${work.author ? `<small>${escapeHTML(work.author)}</small>` : ""}${work.theme ? `<small class="work-theme">Тема: ${escapeHTML(work.theme)}</small>` : ""}<span class="work-arrow">↗</span></article>`).join("") : '<div class="empty-state"><strong>Поки що немає робіт</strong><span>Учнівські роботи з’являться тут після першої публікації.</span></div>';
+}
+function renderPublicWorks() {
+  const filtered = publicWorksCache.filter((work) => {
+    const subjectMatch = matchesSubjectFilter(publicWorkSubjectFilter, work.subject);
+    const studentMatch = publicWorkStudentFilter === "all" || work.author_id === publicWorkStudentFilter;
+    const themeMatch = publicWorkThemeFilter === "all" || work.theme === publicWorkThemeFilter;
+    return subjectMatch && studentMatch && themeMatch;
+  });
+  renderWorks(filtered.map((work) => ({
+    title: work.title,
+    text: work.description,
+    type: subjectLabels[work.subject] || "Робота",
+    author: work.profiles?.full_name || "",
+    media: work.work_media || [],
+    subject: work.subject,
+    author_id: work.author_id,
+    theme: work.theme
+  })));
+}
+function populatePublicWorkFilters(students = []) {
+  const subjectSelect = $("#works-subject-filter");
+  const studentSelect = $("#works-student-filter");
+  const themeSelect = $("#works-theme-filter");
+  if (!subjectSelect || !studentSelect || !themeSelect) return;
+  const themes = [...new Set(publicWorksCache.map((work) => work.theme).filter(Boolean))].sort((a, b) => a.localeCompare(b, "uk"));
+  themeSelect.innerHTML = '<option value="all">Усі теми</option>' + themes.map((theme) => `<option value="${escapeHTML(theme)}">${escapeHTML(theme)}</option>`).join("");
+  subjectSelect.value = publicWorkSubjectFilter;
+  studentSelect.innerHTML = '<option value="all">Усі учні</option>' + students.map((student) => `<option value="${escapeHTML(student.id)}">${escapeHTML(student.name)}</option>`).join("");
+  studentSelect.value = publicWorkStudentFilter;
+  themeSelect.value = themes.includes(publicWorkThemeFilter) ? publicWorkThemeFilter : "all";
+  publicWorkThemeFilter = themeSelect.value;
 }
 function renderRegistrationCodes(codes = []) {
   $("#registration-codes-list").innerHTML = codes.length
@@ -142,16 +193,21 @@ async function createRegistrationCode(event) {
 }
 async function loadWorks() {
   if (!hasSupabase) return renderWorks();
-  const result = await client.from("works").select("id, title, description, subject, profiles(full_name), work_media(file_name, public_url, media_kind)").eq("status", "published").order("created_at", { ascending: false });
+  const result = await client.from("works").select("id, author_id, title, description, subject, theme, profiles(full_name), work_media(file_name, public_url, media_kind)").eq("status", "published").order("created_at", { ascending: false });
   if (result.error) return showToast("Не вдалося завантажити роботи.");
-  const subjectNames = { literature: "Література", language: "Мова", creative: "Творчість" };
-  renderWorks(result.data.map((work) => ({
+  publicWorksCache = result.data.map((work) => ({
+    id: work.id,
+    author_id: work.author_id,
     title: work.title,
-    text: work.description,
-    type: subjectNames[work.subject] || "Робота",
-    author: work.profiles?.full_name || "",
-    media: work.work_media || []
-  })));
+    description: work.description,
+    subject: work.subject,
+    theme: work.theme || "Інша тема",
+    profiles: work.profiles,
+    work_media: work.work_media || []
+  }));
+  const students = [...new Map(publicWorksCache.filter((work) => work.author_id).map((work) => [work.author_id, { id: work.author_id, name: work.profiles?.full_name || "Учень" }])).values()];
+  populatePublicWorkFilters(students);
+  renderPublicWorks();
 }
 async function uploadWorkFiles(workId, files) {
   if (!files.length) return [];
@@ -187,7 +243,7 @@ function openWorkForm() {
     return showToast("Додавати проєкти можна після підтвердження акаунта адміністратором.");
   }
   $("#auth-modal").hidden = false;
-  $("#auth-content").innerHTML = `<p class="eyebrow">галерея класу</p><h2>Додати проєкт</h2><p>Після надсилання робота потрапить адміністратору на перевірку.</p><form id="work-form"><label for="work-title">Назва</label><input id="work-title" maxlength="120" required><label for="work-subject">Розділ</label><select id="work-subject" required><option value="literature">Українська література</option><option value="language">Українська мова</option><option value="creative">Творчість</option></select><label for="work-description">Опис або текст роботи</label><textarea id="work-description" maxlength="2000" required></textarea><label for="work-files">Фото, відео або інші файли</label><input id="work-files" type="file" multiple accept="image/*,video/*,.pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.zip,.rar"><small class="helper-text">Можна завантажити кілька файлів: фото, відео, PDF, документи тощо.</small><button class="primary-button" type="submit">Надіслати на перевірку <span>→</span></button></form>`;
+  $("#auth-content").innerHTML = `<p class="eyebrow">галерея класу</p><h2>Додати проєкт</h2><p>Після надсилання робота потрапить адміністратору на перевірку.</p><form id="work-form"><label for="work-title">Назва</label><input id="work-title" maxlength="120" required><label for="work-subject">Розділ</label><select id="work-subject" required><option value="literature">Українська література</option><option value="language">Українська мова</option><option value="creative">Творчість</option></select><label for="work-theme">Тема</label><input id="work-theme" list="work-theme-list" maxlength="80" placeholder="Наприклад: Літери та звуки" required><datalist id="work-theme-list">${[...new Set(publicWorksCache.map((work) => work.theme).filter(Boolean).concat(["Літери та звуки", "Речення", "Твори про рідну землю", "Підсумкова робота"]))].slice(0, 12).map((theme) => `<option value="${escapeHTML(theme)}"></option>`).join("")}</datalist><label for="work-description">Опис або текст роботи</label><textarea id="work-description" maxlength="2000" required></textarea><label for="work-files">Фото, відео або інші файли</label><input id="work-files" type="file" multiple accept="image/*,video/*,.pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.zip,.rar"><small class="helper-text">Можна завантажити кілька файлів: фото, відео, PDF, документи тощо.</small><button class="primary-button" type="submit">Надіслати на перевірку <span>→</span></button></form>`;
   $("#work-form").addEventListener("submit", submitWork);
 }
 async function submitWork(event) {
@@ -199,6 +255,7 @@ async function submitWork(event) {
     title: $("#work-title").value.trim(),
     description: $("#work-description").value.trim(),
     subject: $("#work-subject").value,
+    theme: $("#work-theme").value.trim() || "Інша тема",
     status: "pending"
   };
   const result = await client.from("works").insert(workPayload).select("id").single();
@@ -214,9 +271,37 @@ async function submitWork(event) {
     $("#auth-modal").hidden = true;
   }
 }
-function renderAdminWorks(works = []) {
-  const subjectNames = { literature: "Література", language: "Мова", creative: "Творчість" };
-  $("#admin-works-list").innerHTML = works.length ? works.map((work) => {
+function renderAdminWorkFilters(users = []) {
+  const subjectButtons = Object.entries(subjectLabels).map(([key, label]) => `<button class="admin-filter-pill ${adminWorkSubjectFilter === key ? "active" : ""}" data-admin-subject="${key}">${escapeHTML(label)}</button>`).join("");
+  const studentButtons = [{ id: "all", name: "Усі учні" }, ...users.filter((user) => user.role !== "admin").map((user) => ({ id: user.id, name: user.name || user.email || "Учень" }))].map((student) => `<button class="admin-filter-pill ${adminWorkStudentFilter === student.id ? "active" : ""}" data-admin-student="${student.id}">${escapeHTML(student.name)}</button>`).join("");
+  const themeButtons = [{ id: "all", name: "Усі теми" }, ...[...new Set((adminWorksCache || []).map((work) => work.theme).filter(Boolean))].sort((a, b) => a.localeCompare(b, "uk")).map((theme) => ({ id: theme, name: theme }))].map((theme) => `<button class="admin-filter-pill ${adminWorkThemeFilter === theme.id ? "active" : ""}" data-admin-theme="${escapeHTML(theme.id)}">${escapeHTML(theme.name)}</button>`).join("");
+  $("#admin-subject-tabs").innerHTML = subjectButtons;
+  $("#admin-student-tabs").innerHTML = studentButtons;
+  $("#admin-theme-tabs").innerHTML = themeButtons;
+  document.querySelectorAll("[data-admin-subject]").forEach((button) => button.addEventListener("click", () => {
+    adminWorkSubjectFilter = button.dataset.adminSubject;
+    renderAdminWorkFilters(users);
+    renderAdminWorks(adminWorksCache, adminWorkSubjectFilter, adminWorkStudentFilter, adminWorkThemeFilter);
+  }));
+  document.querySelectorAll("[data-admin-student]").forEach((button) => button.addEventListener("click", () => {
+    adminWorkStudentFilter = button.dataset.adminStudent;
+    renderAdminWorkFilters(users);
+    renderAdminWorks(adminWorksCache, adminWorkSubjectFilter, adminWorkStudentFilter, adminWorkThemeFilter);
+  }));
+  document.querySelectorAll("[data-admin-theme]").forEach((button) => button.addEventListener("click", () => {
+    adminWorkThemeFilter = button.dataset.adminTheme;
+    renderAdminWorkFilters(users);
+    renderAdminWorks(adminWorksCache, adminWorkSubjectFilter, adminWorkStudentFilter, adminWorkThemeFilter);
+  }));
+}
+function renderAdminWorks(works = [], subject = adminWorkSubjectFilter, studentId = adminWorkStudentFilter, theme = adminWorkThemeFilter) {
+  const filteredWorks = works.filter((work) => {
+    const subjectMatch = matchesSubjectFilter(subject, work.subject);
+    const studentMatch = studentId === "all" || work.author_id === studentId;
+    const themeMatch = theme === "all" || work.theme === theme;
+    return subjectMatch && studentMatch && themeMatch;
+  });
+  $("#admin-works-list").innerHTML = filteredWorks.length ? filteredWorks.map((work) => {
     const author = work.profiles?.full_name || work.profiles?.email || "Невідомий учень";
     const statusNames = { pending: "на перевірці", published: "опубліковано", rejected: "відхилено" };
     const actions = work.status === "pending"
@@ -225,16 +310,17 @@ function renderAdminWorks(works = []) {
     const mediaLinks = Array.isArray(work.work_media) && work.work_media.length
       ? `<div class="work-attachments">${work.work_media.map((item) => `<a href="${escapeHTML(item.public_url || "#")}" target="_blank" rel="noreferrer">${escapeHTML(item.file_name || "Файл")}</a>`).join("")}</div>`
       : "";
-    return `<div class="admin-work-row"><div class="user-info"><b>${escapeHTML(work.title)}</b><small>${escapeHTML(author)} · ${subjectNames[work.subject] || "Робота"} · ${statusNames[work.status] || work.status}</small><p>${escapeHTML(work.description)}</p>${mediaLinks}</div><div class="admin-work-actions">${actions}</div></div>`;
-  }).join("") : "<p style=\"padding:24px;color:#777\">Проєктів ще немає.</p>";
+    return `<div class="admin-work-row"><div class="user-info"><b>${escapeHTML(work.title)}</b><small>${escapeHTML(author)} · ${subjectLabels[work.subject] || "Робота"} · ${escapeHTML(work.theme || "Інша тема")} · ${statusNames[work.status] || work.status}</small><p>${escapeHTML(work.description)}</p>${mediaLinks}</div><div class="admin-work-actions">${actions}</div></div>`;
+  }).join("") : "<p style=\"padding:24px;color:#777\">За цим фільтром робіт немає.</p>";
   document.querySelectorAll(".approve-work, .reject-work").forEach((button) => button.addEventListener("click", () => moderateWork(button.dataset.id, button.classList.contains("approve-work") ? "published" : "rejected")));
   document.querySelectorAll(".delete-work").forEach((button) => button.addEventListener("click", () => deleteWork(button.dataset.id)));
 }
 async function loadAdminWorks() {
   if (!hasSupabase || currentUser?.role !== "admin") return;
-  const result = await client.from("works").select("id, title, description, subject, status, created_at, profiles(full_name, email), work_media(file_name, public_url, media_kind)").order("created_at", { ascending: false });
+  const result = await client.from("works").select("id, author_id, title, description, subject, theme, status, created_at, profiles(full_name, email), work_media(file_name, public_url, media_kind)").order("created_at", { ascending: false });
   if (result.error) return showToast(`Не вдалося завантажити проєкти: ${result.error.message}`);
-  renderAdminWorks(result.data);
+  adminWorksCache = result.data.map((work) => ({ ...work, theme: work.theme || "Інша тема" }));
+  renderAdminWorks(adminWorksCache, adminWorkSubjectFilter, adminWorkStudentFilter, adminWorkThemeFilter);
 }
 async function moderateWork(id, status) {
   const result = await client.from("works").update({ status }).eq("id", id);
@@ -410,6 +496,7 @@ async function renderAdmin() {
     }
     const next = getDemoUsers(); next.splice(Number(button.dataset.index), 1); localStorage.setItem(demoUsersKey, JSON.stringify(next)); renderAdmin(); showToast("Акаунт видалено.");
   }));
+  renderAdminWorkFilters(users);
   loadRegistrationCodes();
   loadAdminWorks();
 }
@@ -427,6 +514,27 @@ $("#copy-registration-code").addEventListener("click", async () => {
     return showToast("Не вдалося скопіювати код. Виділіть його та скопіюйте вручну.");
   }
   showToast("Код скопійовано.");
+});
+$("#works-subject-filter")?.addEventListener("change", (event) => {
+  publicWorkSubjectFilter = event.target.value;
+  renderPublicWorks();
+});
+$("#works-student-filter")?.addEventListener("change", (event) => {
+  publicWorkStudentFilter = event.target.value;
+  renderPublicWorks();
+});
+$("#works-theme-filter")?.addEventListener("change", (event) => {
+  publicWorkThemeFilter = event.target.value;
+  renderPublicWorks();
+});
+$("#clear-works-filters")?.addEventListener("click", () => {
+  publicWorkSubjectFilter = "all";
+  publicWorkStudentFilter = "all";
+  publicWorkThemeFilter = "all";
+  $("#works-subject-filter").value = "all";
+  $("#works-student-filter").value = "all";
+  $("#works-theme-filter").value = "all";
+  renderPublicWorks();
 });
 $("#profile-button").addEventListener("click", () => currentUser ? showToast(`Ви увійшли як ${currentUser.name || "учасник"}.`) : openAuth("login"));
 $("#logout-button").addEventListener("click", signOut);

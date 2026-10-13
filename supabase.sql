@@ -19,6 +19,7 @@ create table if not exists public.works (
   title text not null check (char_length(trim(title)) between 3 and 120),
   description text not null check (char_length(trim(description)) between 3 and 2000),
   subject text not null check (subject in ('literature', 'language', 'creative')),
+  theme text not null default 'Інша тема' check (char_length(trim(theme)) between 2 and 80),
   status text not null default 'pending' check (status in ('pending', 'published', 'rejected')),
   created_at timestamptz not null default now()
 );
@@ -61,6 +62,10 @@ create table if not exists public.registration_codes (
 alter table public.profiles add column if not exists email text;
 alter table public.profiles alter column phone drop not null;
 alter table public.profiles alter column identity_key_hash drop not null;
+alter table public.works add column if not exists theme text;
+update public.works set theme = 'Інша тема' where theme is null or trim(theme) = '';
+alter table public.works alter column theme set default 'Інша тема';
+alter table public.works alter column theme set not null;
 create unique index if not exists profiles_email_unique on public.profiles(email) where email is not null;
 
 create or replace function public.handle_new_user()
