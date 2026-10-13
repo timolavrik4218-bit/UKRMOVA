@@ -2,6 +2,8 @@ const SUPABASE_URL = "https://axuhkvmhwzusrkazcdvn.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF4dWhrdm1od3p1c3JrYXpjZHZuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE4MjIyMTAsImV4cCI6MjEwNzM5ODIxMH0.UmuHi8S-dyC8BAXI-H-yUspAJpGZBElvaIPJ6oVDyjw";
 const ADMIN_EMAIL = "timo.lavrik4218@gmail.com";
 const INACTIVITY_TIMEOUT_MS = 10 * 60 * 1000;
+// Accounts that are never signed out automatically.
+const NO_TIMEOUT_EMAILS = ["gayda.ivanna@gmail.com"];
 // Set this only for local demo mode. In production assign the role in Supabase SQL.
 const DEMO_ADMIN_PHONE = "+380000000000";
 const hasSupabase = window.supabase && !SUPABASE_URL.includes("YOUR_PROJECT") && !SUPABASE_ANON_KEY.includes("YOUR_ANON_KEY");
@@ -365,6 +367,7 @@ function stopInactivityTimer() {
 }
 function startInactivityTimer() {
   stopInactivityTimer();
+  if (NO_TIMEOUT_EMAILS.includes((currentUser?.email || "").toLowerCase())) return;
   inactivityTimer = setTimeout(() => {
     signOut("Вас автоматично виведено після 10 хвилин бездіяльності.");
   }, INACTIVITY_TIMEOUT_MS);
