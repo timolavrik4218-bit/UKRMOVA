@@ -73,8 +73,30 @@ async function saveDailyLesson(event) {
   $("#lesson-homework").value = "";
   showToast("Тему й домашнє завдання збережено.");
 }
+function detectMediaKind(file) {
+  if (!file) return "document";
+  if (file.type?.startsWith("image/")) return "image";
+  if (file.type?.startsWith("video/")) return "video";
+  if (file.type?.startsWith("audio/")) return "audio";
+  if (/zip|rar|7z/.test(file.type || file.name)) return "archive";
+  return "document";
+}
+function renderMediaPreview(media = []) {
+  if (!media.length) return "";
+  const preview = media.find((item) => ["image", "video"].includes(item.media_kind)) || media[0];
+  if (!preview || !preview.public_url) {
+    return `<div class="work-media media-file"><a href="${preview ? escapeHTML(preview.public_url || "#") : "#"}" target="_blank" rel="noreferrer">📎 ${escapeHTML(preview?.file_name || "Файл")}</a></div>`;
+  }
+  if (preview.media_kind === "image") {
+    return `<div class="work-media"><img src="${escapeHTML(preview.public_url)}" alt="${escapeHTML(preview.file_name || "Зображення роботи")}" loading="lazy"></div>`;
+  }
+  if (preview.media_kind === "video") {
+    return `<div class="work-media"><video src="${escapeHTML(preview.public_url)}" controls playsinline preload="metadata"></video></div>`;
+  }
+  return `<div class="work-media media-file"><a href="${escapeHTML(preview.public_url)}" target="_blank" rel="noreferrer">📎 ${escapeHTML(preview.file_name || "Файл")}</a></div>`;
+}
 function renderWorks(works = []) {
-  $("#works-grid").innerHTML = works.length ? works.map((work) => `<article class="work-card"><span class="work-type">${escapeHTML(work.type)}</span><h3>${escapeHTML(work.title)}</h3><p>${escapeHTML(work.text)}</p>${work.author ? `<small>${escapeHTML(work.author)}</small>` : ""}<span class="work-arrow">↗</span></article>`).join("") : '<div class="empty-state"><strong>Поки що немає робіт</strong><span>Учнівські роботи з’являться тут після першої публікації.</span></div>';
+  $("#works-grid").innerHTML = works.length ? works.map((work) => `<article class="work-card">${renderMediaPreview(work.media || [])}<span class="work-type">${escapeHTML(work.type)}</span><h3>${escapeHTML(work.title)}</h3><p>${escapeHTML(work.text)}</p>${work.author ? `<small>${escapeHTML(work.author)}</small>` : ""}<span class="work-arrow">↗</span></article>`).join("") : '<div class="empty-state"><strong>Поки що немає робіт</strong><span>Учнівські роботи з’являться тут після першої публікації.</span></div>';
 }
 function renderRegistrationCodes(codes = []) {
   $("#registration-codes-list").innerHTML = codes.length
@@ -120,15 +142,44 @@ async function createRegistrationCode(event) {
 }
 async function loadWorks() {
   if (!hasSupabase) return renderWorks();
-  const result = await client.from("works").select("title, description, subject, profiles(full_name)").eq("status", "published").order("created_at", { ascending: false });
+  const result = await client.from("works").select("id, title, description, subject, profiles(full_name), work_media(file_name, public_url, media_kind)").eq("status", "published").order("created_at", { ascending: false });
   if (result.error) return showToast("Не вдалося завантажити роботи.");
   const subjectNames = { literature: "Література", language: "Мова", creative: "Творчість" };
   renderWorks(result.data.map((work) => ({
     title: work.title,
     text: work.description,
     type: subjectNames[work.subject] || "Робота",
-    author: work.profiles?.full_name || ""
+    author: work.profiles?.full_name || "",
+    media: work.work_media || []
   })));
+}
+async function uploadWorkFiles(workId, files) {
+  if (!files.length) return [];
+  const uploaded = [];
+  for (const file of files) {
+    const folderName = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const safeName = file.name.replace(/\s+/g, "-").replace(/[^a-zA-Z0-9_.-]/g, "");
+    const path = `${currentUser.id}/${workId}/${folderName}-${safeName}`;
+    const uploadResult = await client.storage.from("work-project-files").upload(path, file, {
+      cacheControl: "3600",
+      upsert: false,
+      contentType: file.type || "application/octet-stream"
+    });
+    if (uploadResult.error) throw new Error(uploadResult.error.message);
+    const publicUrl = client.storage.from("work-project-files").getPublicUrl(path).data.publicUrl;
+    const record = await client.from("work_media").insert({
+      work_id: workId,
+      file_name: file.name,
+      storage_path: path,
+      public_url: publicUrl,
+      mime_type: file.type || "application/octet-stream",
+      file_size: file.size || 0,
+      media_kind: detectMediaKind(file)
+    });
+    if (record.error) throw new Error(record.error.message);
+    uploaded.push({ file_name: file.name, public_url: publicUrl, media_kind: detectMediaKind(file) });
+  }
+  return uploaded;
 }
 function openWorkForm() {
   if (!currentUser) return openAuth("login");
@@ -136,22 +187,32 @@ function openWorkForm() {
     return showToast("Додавати проєкти можна після підтвердження акаунта адміністратором.");
   }
   $("#auth-modal").hidden = false;
-  $("#auth-content").innerHTML = `<p class="eyebrow">галерея класу</p><h2>Додати проєкт</h2><p>Після надсилання робота потрапить адміністратору на перевірку.</p><form id="work-form"><label for="work-title">Назва</label><input id="work-title" maxlength="120" required><label for="work-subject">Розділ</label><select id="work-subject" required><option value="literature">Українська література</option><option value="language">Українська мова</option><option value="creative">Творчість</option></select><label for="work-description">Опис або текст роботи</label><textarea id="work-description" maxlength="2000" required></textarea><button class="primary-button" type="submit">Надіслати на перевірку <span>→</span></button></form>`;
+  $("#auth-content").innerHTML = `<p class="eyebrow">галерея класу</p><h2>Додати проєкт</h2><p>Після надсилання робота потрапить адміністратору на перевірку.</p><form id="work-form"><label for="work-title">Назва</label><input id="work-title" maxlength="120" required><label for="work-subject">Розділ</label><select id="work-subject" required><option value="literature">Українська література</option><option value="language">Українська мова</option><option value="creative">Творчість</option></select><label for="work-description">Опис або текст роботи</label><textarea id="work-description" maxlength="2000" required></textarea><label for="work-files">Фото, відео або інші файли</label><input id="work-files" type="file" multiple accept="image/*,video/*,.pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.zip,.rar"><small class="helper-text">Можна завантажити кілька файлів: фото, відео, PDF, документи тощо.</small><button class="primary-button" type="submit">Надіслати на перевірку <span>→</span></button></form>`;
   $("#work-form").addEventListener("submit", submitWork);
 }
 async function submitWork(event) {
   event.preventDefault();
   if (!hasSupabase) return showToast("Надсилання проєктів доступне після підключення Supabase.");
-  const result = await client.from("works").insert({
+  const files = Array.from($("#work-files").files || []);
+  const workPayload = {
     author_id: currentUser.id,
     title: $("#work-title").value.trim(),
     description: $("#work-description").value.trim(),
     subject: $("#work-subject").value,
     status: "pending"
-  });
+  };
+  const result = await client.from("works").insert(workPayload).select("id").single();
   if (result.error) return showToast(`Не вдалося надіслати проєкт: ${result.error.message}`);
-  $("#auth-modal").hidden = true;
-  showToast("Проєкт надіслано адміністратору на перевірку.");
+  try {
+    if (files.length) {
+      await uploadWorkFiles(result.data.id, files);
+    }
+    $("#auth-modal").hidden = true;
+    showToast("Проєкт надіслано адміністратору на перевірку.");
+  } catch (error) {
+    showToast(`Проєкт збережено, але файли не завантажилися: ${error.message}`);
+    $("#auth-modal").hidden = true;
+  }
 }
 function renderAdminWorks(works = []) {
   const subjectNames = { literature: "Література", language: "Мова", creative: "Творчість" };
@@ -161,14 +222,17 @@ function renderAdminWorks(works = []) {
     const actions = work.status === "pending"
       ? `<button class="approve-work" data-id="${escapeHTML(work.id)}">Дозволити</button><button class="reject-work" data-id="${escapeHTML(work.id)}">Відхилити</button>`
       : `<button class="delete-work" data-id="${escapeHTML(work.id)}">Видалити</button>`;
-    return `<div class="admin-work-row"><div class="user-info"><b>${escapeHTML(work.title)}</b><small>${escapeHTML(author)} · ${subjectNames[work.subject] || "Робота"} · ${statusNames[work.status] || work.status}</small><p>${escapeHTML(work.description)}</p></div><div class="admin-work-actions">${actions}</div></div>`;
+    const mediaLinks = Array.isArray(work.work_media) && work.work_media.length
+      ? `<div class="work-attachments">${work.work_media.map((item) => `<a href="${escapeHTML(item.public_url || "#")}" target="_blank" rel="noreferrer">${escapeHTML(item.file_name || "Файл")}</a>`).join("")}</div>`
+      : "";
+    return `<div class="admin-work-row"><div class="user-info"><b>${escapeHTML(work.title)}</b><small>${escapeHTML(author)} · ${subjectNames[work.subject] || "Робота"} · ${statusNames[work.status] || work.status}</small><p>${escapeHTML(work.description)}</p>${mediaLinks}</div><div class="admin-work-actions">${actions}</div></div>`;
   }).join("") : "<p style=\"padding:24px;color:#777\">Проєктів ще немає.</p>";
   document.querySelectorAll(".approve-work, .reject-work").forEach((button) => button.addEventListener("click", () => moderateWork(button.dataset.id, button.classList.contains("approve-work") ? "published" : "rejected")));
   document.querySelectorAll(".delete-work").forEach((button) => button.addEventListener("click", () => deleteWork(button.dataset.id)));
 }
 async function loadAdminWorks() {
   if (!hasSupabase || currentUser?.role !== "admin") return;
-  const result = await client.from("works").select("id, title, description, subject, status, created_at, profiles(full_name, email)").order("created_at", { ascending: false });
+  const result = await client.from("works").select("id, title, description, subject, status, created_at, profiles(full_name, email), work_media(file_name, public_url, media_kind)").order("created_at", { ascending: false });
   if (result.error) return showToast(`Не вдалося завантажити проєкти: ${result.error.message}`);
   renderAdminWorks(result.data);
 }

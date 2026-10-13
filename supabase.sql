@@ -23,6 +23,18 @@ create table if not exists public.works (
   created_at timestamptz not null default now()
 );
 
+create table if not exists public.work_media (
+  id uuid primary key default gen_random_uuid(),
+  work_id uuid not null references public.works(id) on delete cascade,
+  file_name text not null,
+  storage_path text not null unique,
+  public_url text not null,
+  mime_type text not null default 'application/octet-stream',
+  file_size integer not null default 0 check (file_size >= 0),
+  media_kind text not null default 'document' check (media_kind in ('image', 'video', 'audio', 'document', 'archive')),
+  created_at timestamptz not null default now()
+);
+
 create table if not exists public.daily_lessons (
   id uuid primary key default gen_random_uuid(),
   lesson_date date not null unique default current_date,
@@ -75,12 +87,35 @@ create trigger on_auth_user_created
 
 alter table public.profiles enable row level security;
 alter table public.works enable row level security;
+alter table public.work_media enable row level security;
 alter table public.daily_lessons enable row level security;
 alter table public.registration_codes enable row level security;
 
 create or replace function public.is_admin()
 returns boolean language sql stable security definer set search_path = public
 as $$ select exists (select 1 from public.profiles where id = auth.uid() and role = 'admin') $$;
+
+insert into storage.buckets (id, name, public)
+values ('work-project-files', 'work-project-files', true)
+on conflict (id) do update set public = true;
+
+drop policy if exists "Anyone can view project files" on storage.objects;
+drop policy if exists "Authenticated users can upload project files" on storage.objects;
+drop policy if exists "Users can update project files they own" on storage.objects;
+drop policy if exists "Users can delete project files they own" on storage.objects;
+
+create policy "Anyone can view project files" on storage.objects for select using (bucket_id = 'work-project-files');
+create policy "Authenticated users can upload project files" on storage.objects for insert with check (
+  bucket_id = 'work-project-files' and auth.role() = 'authenticated'
+);
+create policy "Users can update project files they own" on storage.objects for update using (
+  bucket_id = 'work-project-files' and (auth.uid() = owner or public.is_admin())
+) with check (
+  bucket_id = 'work-project-files' and (auth.uid() = owner or public.is_admin())
+);
+create policy "Users can delete project files they own" on storage.objects for delete using (
+  bucket_id = 'work-project-files' and (auth.uid() = owner or public.is_admin())
+);
 
 create or replace function public.admin_delete_user(target_user_id uuid)
 returns void
@@ -227,6 +262,9 @@ drop policy if exists "Published works are public" on public.works;
 drop policy if exists "Students create own works" on public.works;
 drop policy if exists "Authors update own pending works" on public.works;
 drop policy if exists "Admins moderate works" on public.works;
+drop policy if exists "Published work media are visible" on public.work_media;
+drop policy if exists "Authors manage own work media" on public.work_media;
+drop policy if exists "Admins manage work media" on public.work_media;
 create policy "Profiles visible to signed in users" on public.profiles for select to authenticated using (true);
 create policy "Admins manage profiles" on public.profiles for all to authenticated using (public.is_admin()) with check (public.is_admin());
 create policy "Published daily lessons are public" on public.daily_lessons for select using (true);
@@ -236,6 +274,24 @@ create policy "Published works are public" on public.works for select using (sta
 create policy "Students create own works" on public.works for insert to authenticated with check (author_id = auth.uid());
 create policy "Authors update own pending works" on public.works for update to authenticated using (author_id = auth.uid() and status = 'pending') with check (author_id = auth.uid());
 create policy "Admins moderate works" on public.works for all to authenticated using (public.is_admin()) with check (public.is_admin());
+create policy "Published work media are visible" on public.work_media for select using (
+  exists (
+    select 1 from public.works w
+    where w.id = work_id and (w.status = 'published' or w.author_id = auth.uid() or public.is_admin())
+  )
+);
+create policy "Authors manage own work media" on public.work_media for all to authenticated using (
+  exists (
+    select 1 from public.works w
+    where w.id = work_id and w.author_id = auth.uid() and w.status = 'pending'
+  )
+) with check (
+  exists (
+    select 1 from public.works w
+    where w.id = work_id and w.author_id = auth.uid() and w.status = 'pending'
+  )
+);
+create policy "Admins manage work media" on public.work_media for all to authenticated using (public.is_admin()) with check (public.is_admin());
 
 -- After creating the first account, promote only the teacher's verified profile:
 -- update public.profiles set role = 'admin', identity_status = 'verified'
